@@ -1,12 +1,25 @@
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
+import io.vertx.core.impl.StringEscapeUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.function.Consumer;
 
 public class VerticleLoader {
-    public static void main(String[] args) {
+    private static Vertx vertx;
+
+    public static Vertx getVertx() {
+        return vertx;
+    }
+
+    public static void load() {
+        load(null);
+    }
+
+    public static void load(Handler<AsyncResult<String>> completionHandler) {
         VertxOptions options = new VertxOptions().setClustered(false);
         //путь до verticle-класса.
         String dir = "chat/src/main/java/";
@@ -25,7 +38,10 @@ public class VerticleLoader {
         Consumer<Vertx> runner = vertx ->
         {
             try {
-                vertx.deployVerticle(verticleID);
+                if (completionHandler == null)
+                    vertx.deployVerticle(verticleID);
+                else
+                    vertx.deployVerticle(verticleID, completionHandler);
             } catch (Throwable t) {
                 t.printStackTrace();
             }
@@ -35,15 +51,19 @@ public class VerticleLoader {
             Vertx.clusteredVertx(options, res ->
             {
                 if (res.succeeded()) {
-                    Vertx vertx = res.result();
+                    vertx = res.result();
                     runner.accept(vertx);
                 } else {
                     res.cause().printStackTrace();
                 }
             });
         } else {
-            Vertx vertx = Vertx.vertx(options);
+            vertx = Vertx.vertx(options);
             runner.accept(vertx);
         }
+    }
+
+    public static void main(String[] args) {
+        load();
     }
 }
