@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat</title>
+    <meta charset="windows-1251">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="//cdn.jsdelivr.net/sockjs/0.3.4/sockjs.min.js"></script>
+    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+    <script src="date-format.js"></script>
+    <script src="vertx-eventbus.js"></script>
+
+    <style type="text/css">
+        body {
+            padding-top: 40px;
+            padding-bottom: 40px;
+            background-color: #f5f5f5;
+        }
+
+        .received{
+            width: 160px;
+            font-size: 10px;
+        }
+
+        input[type=text]:focus, textarea:focus{
+            box-shadow: 0 0 5px #4cae4c;
+            border: 1px solid #4cae4c;
+        }
+
+        .tab-content{
+            padding:5px
+        }
+    </style>
+
+    <script>
+        var online = 0; //счетчик онлайн-пользователей.
+        var eb = new EventBus("/eventbus/"); //шина событий.
+
+        eb.onopen = function() {
+            //обработчик событий в чате.
+            eb.registerHandler("chat.to.client", eventChatProcessing);
+        };
+
+        //обработчик событий в чате.
+        function eventChatProcessing(err, msg) {
+            var event = jQuery.parseJSON(msg.body);
+
+			if (event.type == 'publish') {//сообщение.
+				var time = Date.parse(event.time);
+				var formattedTime = dateFormat(time, "dd.mm.yy HH:MM:ss");
+
+				//добавить сообщение.
+				appendMsg(event.host, event.port, event.message, formattedTime);
+			} else { //изменение числа пользователей.
+			    //type: register или close.
+			    online = event.online;
+				$('#online').text(online);
+			}
+        };
+
+        //добавление нового сообщения.
+		function appendMsg(host, port, message, formattedTime){
+			var $msg = $('<tr bgcolor="#dff0d8"><td align="left">' + formattedTime
+					+ '</td><td align="left">' + host + ' [' + port + ']'
+					+ '</td><td>' + message
+					+ '</td></tr>');
+
+            var countMsg = $('#messages tr').length;
+			if (countMsg == 0)
+				$('#messages').append($msg);
+			else
+			    $('#messages > tbody > tr:first').before($msg);
+		}
+
+        $(document).ready(function() {
+            //событие отправления сообщения.
+            $('#chatForm').submit(function(evt) {
+                evt.preventDefault();
+                var message = $('#message').val();
+                if (message.length > 0) {
+                    //отправление сообщения на шину событий.
+                    eb.publish("chat.to.server", message);
+                    $('#message').val("").focus();
+                    countChar();
+                }
+            });
+        });
+
+        //счетчик введенных символов.
+        function countChar() {
+            var len = $('#message').val().length;
+            if (len > 140) {
+                var msg = $('#message').val().substring(0, 140);
+                $('#message').val(msg);
+            } else {
+                $('#charNum').text(140 - len);
+                var per = 100 / 140 * len;
+                $('#charNumProgressBar').css('width', per+'%').attr('aria-valuenow', per);
+            }
+        };
+    </script>
+</head>
+<body>
+    <div class="container chat-wrapper">
+        <form id="chatForm">
+            <h2 align="center" class="alert alert-success">CHAT ROOM</h2>
+            <fieldset>
+                <div class="input-group input-group-lg">
+                    <span class="input-group-addon" id="onlineIco">
+                        <span class="glyphicon glyphicon-eye-open"></span>
+                    </span>
+                    <span class="input-group-addon" id="online">
+                        <span class="glyphicon glyphicon-option-horizontal"></span>
+                    </span>
+                    <input type="text" maxlength="141" autocomplete="off" class="form-control"
+                        placeholder="What's new?" id="message" aria-describedby="sizing-addon1"
+                        onkeyup="countChar()"/>
+                    <span class="input-group-btn">
+                        <button class="btn btn-success" type="submit">
+                            <span class="glyphicon glyphicon-send"></span>
+                        </button>
+                    </span>
+                </div>
+            </fieldset>
+
+            <h3 id="charNum">140</h3>
+
+            <div class="progress">
+                <div id="charNumProgressBar" class="progress-bar progress-bar-success active" role="progressbar"
+                     aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">
+                    <span class="sr-only">100% Complete</span>
+                </div>
+            </div>
+
+            <div class="panel panel-success">
+                <div class="panel-heading"><h3>New messages</h3></div>
+                    <table id="messages" class="table table-hover" width="100%">
+                        <colgroup>
+                            <col style="width:10%">
+                            <col style="width:10%">
+                            <col style="width:10%">
+                        </colgroup>
+                    </table>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
