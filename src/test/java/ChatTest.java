@@ -21,7 +21,7 @@ public class ChatTest {
     //@Ignore
     @Before
     public void setUp(TestContext context) throws IOException {
-        //развертывание нашей Verticle.
+        //deployment of our Verticle.
         VerticleLoader.load(context.asyncAssertSuccess());
         vertx = VerticleLoader.getVertx();
     }
@@ -40,11 +40,11 @@ public class ChatTest {
         Async async = context.async();
         vertx.createHttpClient().getNow(port, "localhost", "/", response ->
         {
-            //проверка доступности развернутого нами приложения.
+            //check of availability of the app deployed by us.
             context.assertEquals(response.statusCode(), 200);
             context.assertEquals(response.headers().get("content-type"), "text/html");
 
-            //проверка содержимого страницы.
+            //check of contents of the page.
             response.bodyHandler(body ->
             {
                 context.assertTrue(body.toString().contains("<title>Chat</title>"));
@@ -60,7 +60,7 @@ public class ChatTest {
 
         Async async = context.async();
         EventBus eb = vertx.eventBus();
-        //ожидание события на шине.
+        //waiting for an event on the bus.
         eb.consumer("chat.to.server").handler(message ->
         {
             String getMsg = message.body().toString();
@@ -68,7 +68,7 @@ public class ChatTest {
             async.complete();
         });
 
-        //отправка сообщения на шину.
+        //sending a message to the bus.
         eb.publish("chat.to.server", "hello");
     }
 }

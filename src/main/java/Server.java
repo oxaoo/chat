@@ -15,19 +15,27 @@ import java.net.BindException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.UnknownHostException;
-import java.util.*;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.vertx.ext.web.handler.sockjs.BridgeEvent.Type.*;
 
+/**
+ * The app server containing logic of the chat.
+ */
 public class Server extends AbstractVerticle {
     private Logger log = LoggerFactory.getLogger(Server.class);
     private SockJSHandler handler = null;
     private AtomicInteger online = new AtomicInteger(0);
 
-    //точка входа.
+    /**
+     * Entry point in the app.
+     */
     @Override
-    public void start() throws Exception {
+    public void start() {
 
         if (!deploy()) {
             log.error("Failed to deploy the server.");
@@ -37,7 +45,11 @@ public class Server extends AbstractVerticle {
         handle();
     }
 
-    //развертывание приложения.
+    /**
+     * Deployment of the app.
+     *
+     * @return deployment result.
+     */
     private boolean deploy() {
         int hostPort = getFreePort();
 
@@ -46,13 +58,13 @@ public class Server extends AbstractVerticle {
 
         Router router = Router.router(vertx);
 
-        //обработчик событий.
+        //the event handler.
         handler = SockJSHandler.create(vertx);
 
         router.route("/eventbus/*").handler(handler);
         router.route().handler(StaticHandler.create());
 
-        //запуск веб-сервера.
+        //start of the web-server.
         vertx.createHttpServer().requestHandler(router::accept).listen(hostPort);
 
         try {
@@ -66,12 +78,16 @@ public class Server extends AbstractVerticle {
         return true;
     }
 
-    //получение свободного порта для развертывания приложения.
+    /**
+     * Receive a free port to deploy the app.
+     *
+     * @return the free port.
+     */
     private int getFreePort() {
         int hostPort = 8080;
 
-        //если порт задан в качестве аргумента,
-        // при запуске приложения.
+        //if the port is set as argument,
+        // when the app starts.
         if (Starter.PROCESS_ARGS != null
                 && Starter.PROCESS_ARGS.size() > 0) {
             try {
@@ -81,15 +97,21 @@ public class Server extends AbstractVerticle {
             }
         }
 
-        //если некорректно указан порт.
+        //if the port is incorrectly specified.
         if (hostPort < 0 || hostPort > 65535)
             hostPort = 8080;
 
         return getFreePort(hostPort);
     }
 
-    //если в качестве порта указано значение 0,
-    // то выдается случайный свободный порт.
+    /**
+     * Receive a free port to deploy the app.
+     * if a port value is specified as 0,
+     * that is given a random free port.
+     *
+     * @param hostPort the desired port.
+     * @return the available port.
+     */
     private int getFreePort(int hostPort) {
         try {
             ServerSocket socket = new ServerSocket(hostPort);
@@ -98,7 +120,7 @@ public class Server extends AbstractVerticle {
 
             return port;
         } catch (BindException e) {
-            //срабатывает, когда указанный порт уже занят.
+            //is executed when the specified port is already in use.
             if (hostPort != 0)
                 return getFreePort(0);
 
@@ -110,12 +132,15 @@ public class Server extends AbstractVerticle {
         }
     }
 
+    /**
+     * Registration of an event handler.
+     */
     private void handle() {
         BridgeOptions opts = new BridgeOptions()
                 .addInboundPermitted(new PermittedOptions().setAddress("chat.to.server"))
                 .addOutboundPermitted(new PermittedOptions().setAddress("chat.to.client"));
 
-        //обработка приходящих событий.
+        //processing incoming events.
         handler.bridge(opts, event -> {
             if (event.type() == PUBLISH)
                 publishEvent(event);
@@ -124,15 +149,20 @@ public class Server extends AbstractVerticle {
                 registerEvent(event);
 
             if (event.type() == SOCKET_CLOSED)
-                closeEvent(event);
+                closeEvent();
 
-            //обратите внимание, после обработки события
-            // должен вызываться говорящий сам за себя метод.
+            //note that after the event processing
+            // must be called speaks for itself method.
             event.complete(true);
         });
     }
 
-    //тип события - публикация сообщения.
+    /**
+     * Publication of the message.
+     *
+     * @param event contains a message.
+     * @return result of the publication.
+     */
     private boolean publishEvent(BridgeEvent event) {
         if (event.rawMessage() != null
                 && event.rawMessage().getString("address").equals("chat.to.server")) {
@@ -150,7 +180,14 @@ public class Server extends AbstractVerticle {
             return false;
     }
 
-    //создание уведомления о публикации сообщения.
+    /**
+     * Creation of the notice of the publication of the message.
+     *
+     * @param host is address to which a message is published.
+     * @param port is port to which a message is published.
+     * @param message published message.
+     * @return wrapper of the published message as the notice.
+     */
     private Map<String, Object> createPublicNotice(String host, int port, String message) {
         Date time = Calendar.getInstance().getTime();
 
@@ -163,7 +200,11 @@ public class Server extends AbstractVerticle {
         return notice;
     }
 
-    //тип события - регистрация обработчика.
+    /**
+     * Registration of the handler.
+     *
+     * @param event contains of the address.
+     */
     private void registerEvent(BridgeEvent event) {
         if (event.rawMessage() != null
                 && event.rawMessage().getString("address").equals("chat.to.client"))
@@ -174,7 +215,11 @@ public class Server extends AbstractVerticle {
             }).start();
     }
 
-    //создание уведомления о регистрации пользователя.
+    /**
+     * Creation of the notice of registration of the user.
+     *
+     * @return registration notice.
+     */
     private Map<String, Object> createRegisterNotice() {
         Map<String, Object> notice = new TreeMap<>();
         notice.put("type", "register");
@@ -182,8 +227,10 @@ public class Server extends AbstractVerticle {
         return notice;
     }
 
-    //тип события - закрытие сокета.
-    private void closeEvent(BridgeEvent event) {
+    /**
+     * Closing of the socket.
+     */
+    private void closeEvent() {
         new Thread(() ->
         {
             Map<String, Object> closeNotice = createCloseNotice();
@@ -191,7 +238,11 @@ public class Server extends AbstractVerticle {
         }).start();
     }
 
-    //создание уведомления о выходе пользвателя из чата.
+    /**
+     * Creation of the notice of the user's exit from a chat.
+     *
+     * @return wrapper of the information about user's exit as the notice.
+     */
     private Map<String, Object> createCloseNotice() {
         Map<String, Object> notice = new TreeMap<>();
         notice.put("type", "close");
@@ -199,9 +250,14 @@ public class Server extends AbstractVerticle {
         return notice;
     }
 
-    //довольно простая проверка сообщения,
-    // конечно её можно усложнить,
-    // но для пример и этого достаточно ;)
+    /**
+     * Pretty simple verification of the message,
+     * of course it can be complicated,
+     * but for example it's enough ;)
+     *
+     * @param msg incoming message.
+     * @return verification result.
+     */
     private boolean verifyMessage(String msg) {
         return msg.length() > 0
                 && msg.length() <= 140;

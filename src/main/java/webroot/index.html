@@ -35,15 +35,15 @@
     </style>
 
     <script>
-        var online = 0; //счетчик онлайн-пользователей.
-        var eb = new EventBus("/eventbus/"); //шина событий.
+        var online = 0; //counter of online users.
+        var eb = new EventBus("/eventbus/"); //event bus.
 
         eb.onopen = function() {
-            //обработчик событий в чате.
+            //registration event handler in the chat.
             eb.registerHandler("chat.to.client", eventChatProcessing);
         };
 
-        //обработчик событий в чате.
+        //event handler in the chat.
         function eventChatProcessing(err, msg) {
             var event = jQuery.parseJSON(msg.body);
 
@@ -60,7 +60,7 @@
 			}
         };
 
-        //добавление нового сообщения.
+        //adding of new message.
 		function appendMsg(host, port, message, formattedTime){
 			var $msg = $('<tr bgcolor="#dff0d8"><td align="left">' + formattedTime
 					+ '</td><td align="left">' + host + ' [' + port + ']'
@@ -75,12 +75,12 @@
 		}
 
         $(document).ready(function() {
-            //событие отправления сообщения.
+            //event of sending of the message.
             $('#chatForm').submit(function(evt) {
                 evt.preventDefault();
                 var message = $('#message').val();
                 if (message.length > 0) {
-                    //отправление сообщения на шину событий.
+                    //sending of the message on the event bus.
                     eb.publish("chat.to.server", message);
                     $('#message').val("").focus();
                     countChar();
@@ -88,7 +88,7 @@
             });
         });
 
-        //счетчик введенных символов.
+        //counter of the entered characters.
         function countChar() {
             var len = $('#message').val().length;
             if (len > 140) {
