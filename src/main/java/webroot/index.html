@@ -47,14 +47,14 @@
         function eventChatProcessing(err, msg) {
             var event = jQuery.parseJSON(msg.body);
 
-			if (event.type == 'publish') {//сообщение.
+			if (event.type == 'publish') {//is message.
 				var time = Date.parse(event.time);
 				var formattedTime = dateFormat(time, "dd.mm.yy HH:MM:ss");
 
-				//добавить сообщение.
+				//add the message.
 				appendMsg(event.host, event.port, event.message, formattedTime);
-			} else { //изменение числа пользователей.
-			    //type: register или close.
+			} else { //change of number of users.
+			    //type: register or close.
 			    online = event.online;
 				$('#online').text(online);
 			}
